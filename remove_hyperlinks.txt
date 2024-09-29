@@ -2,16 +2,35 @@ Sub ExtractHyperlinks()
     Dim HyperlinkCell As Range
     Dim HyperlinkURL As String
     Dim LastRow As Long
+    Dim i As Long
 
-    ' Replace "A" with the column that contains the hyperlinks
+    ' Add headers to columns A and B
+    Rows(1).Insert
+    Cells(1, 1).Value = "Section"
+    Cells(1, 2).Value = "Url"
+
+    ' Recalculate last row after inserting header
     LastRow = Cells(Rows.Count, "A").End(xlUp).Row
-    
-    For Each HyperlinkCell In Range("A1:A" & LastRow)
+
+    ' Loop through column A and remove empty rows and rows with [View]
+    For i = LastRow To 2 Step -1
+        If IsEmpty(Cells(i, "A")) Or Cells(i, "A").Value = "[View]" Then
+            Rows(i).Delete
+        End If
+    Next i
+
+    ' Recalculate the last row after deletions
+    LastRow = Cells(Rows.Count, "A").End(xlUp).Row
+
+    ' Extract hyperlinks and remove them from column A
+    For Each HyperlinkCell In Range("A2:A" & LastRow)
         ' Check if the cell contains a hyperlink
         If HyperlinkCell.Hyperlinks.Count > 0 Then
             HyperlinkURL = HyperlinkCell.Hyperlinks(1).Address
-            ' Output the URL to the adjacent column (replace "B" with the column for URLs)
+            ' Output the URL to the adjacent column (column B)
             HyperlinkCell.Offset(0, 1).Value = HyperlinkURL
+            ' Remove the hyperlink but keep the display text
+            HyperlinkCell.Hyperlinks.Delete
         End If
     Next HyperlinkCell
 End Sub
