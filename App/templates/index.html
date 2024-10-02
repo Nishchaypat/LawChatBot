@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Law Chat</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        
+        textarea {
+            width: 100%;
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            margin-bottom: 20px;
+            font-size: 16px;
+        }
+        
+        button {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        button:hover {
+            background-color: #0056b3;
+        }
+        
+        #results {
+            margin-top: 20px;
+        }
+        
+        .result {
+            background-color: #f1f1f1;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .result h3 {
+            margin: 0;
+            font-size: 18px;
+        }
+        
+        .result p {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Law Text Semantic Search</h1>
+        <textarea id="law-text" placeholder="Enter law-related text..." rows="10"></textarea>
+        <button onclick="submitText()">Search</button>
+        <div id="results">
+            <!-- Search results will appear here -->
+        </div>
+    </div>
+
+    <script>
+        function submitText() {
+            const lawText = document.getElementById('law-text').value;
+        
+            if (lawText.trim() === "") {
+                alert("Please enter some law-related text.");
+                return;
+            }
+        
+            fetch('/search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ text: lawText })
+            })
+            .then(response => response.json())
+            .then(data => {
+                displayResults(data);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        }
+        
+        function displayResults(results) {
+            const resultsContainer = document.getElementById('results');
+            resultsContainer.innerHTML = ''; // Clear previous results
+        
+            results.forEach(result => {
+                const resultDiv = document.createElement('div');
+                resultDiv.classList.add('result');
+        
+                resultDiv.innerHTML = `
+                    <h3>Matched Title: ${result.id}</h3>
+                    <p><strong>URL:</strong> <a href="${result.url}" target="_blank">${result.url}</a></p>
+                    <p><strong>Section:</strong> ${result.section}</p>
+                    <p><strong>Similarity Score:</strong> ${result.score.toFixed(2)}</p>
+                `;
+        
+                resultsContainer.appendChild(resultDiv);
+            });
+        }        
+    </script>
+</body>
+</html>
+
