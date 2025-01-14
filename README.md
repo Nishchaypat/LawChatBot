@@ -85,3 +85,7 @@ An interactive UI allows users to:
 
 By integrating web scraping, NLP-based data cleaning, LegalBERT embeddings, and vector search technology, this chatbot bridges the gap between complex legal texts and user-friendly query-based retrieval. It provides a robust tool for modern legal research, offering precision, accessibility, and enhanced decision-making.
 
+---
+
+**This approach was not an intended method for the research, but a stepping stone to an Advanced Agentic RAG application, projected to be made by March 2025.**
+
