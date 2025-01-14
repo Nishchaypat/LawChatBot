@@ -1,24 +1,87 @@
-## Premature and brute approach to RAG application for a Law Article
+# Premature and Brute Approach to RAG Application for a Law Article
 
+This research presents the development of a legal chatbot designed to assist users in navigating contradicting (similar) legal content with improved precision and speed. The chatbot follows a structured five-stage process:
 
-This research presents the development of a legal chatbot designed to assist users in navigating contradicting (similar) legal content with improved precision and speed. The chatbot follows a structured five-stage process: Data Extraction, Data Cleaning and Organizing, Vector Database Conversion, FAISS and Retrieval-Augmented Generation (RAG), and Displaying Results.
-Data Extraction
-The first stage involves extracting legal content from Title 18, Part 1 Crimes as a prototype chapter. We used web scraping tools, including Selenium and BeautifulSoup, to automate content retrieval. A Python-based scraper was developed to navigate the web pages, locate chapter headings, and extract related content. Although many chapters followed a consistent structure, variations in formatting and inconsistent titles made fully automated extraction challenging. For instance, while some sections adhered to standard numbering conventions, others contained outliers that disrupted automated processes. Due to these limitations, manual intervention was necessary. Data was ultimately compiled into Excel for further refinement.
-Data Cleaning and Organizing
-In this stage, we enhanced data structure and quality using a combination of manual techniques and programming. VBA macros in Excel helped separate URLs into individual columns, remove unnecessary keywords and empty rows, and add appropriate headers. The cleaned data was organized into three primary columns: Section Number, URL, and Content.
-We also observed that certain portions of the content contained metadata, such as citations and references, which provided supplementary information rather than substantive legal text. Distinguishing metadata from substantive content is crucial for improving the chatbot’s accuracy and performance. Metadata often consists of auxiliary information that, while valuable for context, does not directly contribute to the semantic meaning necessary for generating precise legal responses. By isolating this data into a separate column, the chatbot can focus its embeddings on the core legal text, reducing noise in similarity searches and enhancing the relevance of retrieved sections. This approach not only optimizes the retrieval of substantive legal content but also allows metadata to be presented separately, offering users additional context without compromising the precision of search results. This metadata needed to be separated from the main content to improve text processing accuracy. For this step, Natural Language Processing (NLP) techniques were applied in Python. A script was developed to distinguish and move metadata into a dedicated column, creating a more structured and efficient dataset. The metadata—containing references and citations—was retained to provide users with additional context and direct access to original legal documents through URLs.
-The combined cleaning strategies were applied to all 123 chapters of Title 18, Part 1 Crimes. Each chapter was stored as a separate CSV file for validation purposes before merging them into a single file for use in subsequent stages.
-Converting Data to a Vector Database
-With the cleaned data prepared, we used LegalBERT, a specialized language model for legal text, to convert content into contextual embeddings. LegalBERT, available from the HuggingFace transformers library, is fine-tuned for legal documents and understands the specific semantics of legal language. We initialized the model and tokenizer using AutoTokenizer and AutoModel classes. For performance optimization, the model was moved to a GPU when available.
-A custom function, get_embedding, tokenized the input text, truncating or padding sequences to a maximum of 512 tokens. Using PyTorch’s torch.no_grad() context, embeddings were computed without tracking gradients, reducing memory consumption. The function averaged token embeddings from the last hidden state to generate sentence-level embeddings that capture the meaning of entire sections. This process was applied to the 'Content' column of the DataFrame, producing an array of embeddings suitable for machine learning tasks and similarity search.
-Storing Embeddings in a Cloud-Based Vector Database
-After generating embeddings, the vectors were stored in a Qdrant vector database, which enables efficient similarity searches. The dimensionality of the embeddings was first determined to configure the vector space. Two types of distance metrics—Euclidean and Cosine distances—were considered, with this implementation using Euclidean distance for similarity retrieval.
-A collection was created in Qdrant to store embeddings. Each embedding was indexed by its row number and paired with metadata, including Section and URL. The upsert method inserted these embeddings into the collection, making them searchable. For user queries, new embeddings were generated by passing input text through the get_embedding function. The resulting embedding was flattened into a one-dimensional list and used as a query vector. Qdrant’s search function retrieved the closest matching sections based on the smallest Euclidean distance—a measure of geometric similarity between vectors.
-Euclidean distance effectively identifies the most semantically relevant legal references by minimizing the space between the input query vector and stored vectors. This approach supports accurate legal information retrieval for classification, similarity detection, and predictive modeling.
+1. **Data Extraction**
+2. **Data Cleaning and Organizing**
+3. **Vector Database Conversion**
+4. **FAISS and Retrieval-Augmented Generation (RAG)**
+5. **Displaying Results**
 
+---
 
+## 1. Data Extraction
 
-(Not needed for the research paper, just for more info!)
-User Interface and Result Display
-A user-friendly interface was developed to allow users to enter text excerpts or queries. The chatbot processes the input and returns the corresponding section number and a ranked list of similar sections based on content similarity. Additional details, including URLs, are provided to improve accessibility to the full legal text. This interactive system offers a practical solution for legal research, enabling users to locate relevant sections efficiently and enhancing decision-making processes by providing direct, contextualized legal information.
-By integrating web scraping, NLP-based data cleaning, LegalBERT embeddings, and vector search technology, this chatbot represents a robust tool for modern legal research, bridging the gap between complex legal texts and user-friendly query-based retrieval.
+The first stage involves extracting legal content from **Title 18, Part 1 Crimes** as a prototype chapter.  
+Tools used: **Selenium** and **BeautifulSoup** for automated content retrieval.  
+
+### Key Challenges:
+- Variations in formatting and inconsistent titles made fully automated extraction difficult.
+- Some sections adhered to standard numbering conventions, while others contained outliers disrupting automation.
+
+**Solution**: Manual intervention was necessary. Data was compiled into **Excel** for refinement.
+
+---
+
+## 2. Data Cleaning and Organizing
+
+In this stage, data structure and quality were enhanced using **VBA macros** in Excel and **NLP techniques** in Python.
+
+### Steps:
+- **URL Separation**: Split into individual columns.
+- **Keyword Removal**: Unnecessary keywords and empty rows were removed.
+- **Metadata Isolation**: Metadata (e.g., citations, references) was moved to a separate column for improved accuracy.
+
+**Benefits**:
+- Focus on core legal text for embeddings.
+- Metadata retained to provide additional context without compromising precision.
+
+### Output:
+- Data organized into three primary columns: **Section Number**, **URL**, and **Content**.
+- All 123 chapters of Title 18 were cleaned and stored as separate **CSV files**.
+
+---
+
+## 3. Converting Data to a Vector Database
+
+Using **LegalBERT**, a specialized language model for legal text, the cleaned content was converted into contextual embeddings.
+
+### Key Techniques:
+- **HuggingFace Transformers**: AutoTokenizer and AutoModel were used.
+- **Performance Optimization**: Model deployed to GPU when available.
+- **Embedding Generation**: Averaged token embeddings to create sentence-level representations.
+
+---
+
+## 4. Storing Embeddings in a Cloud-Based Vector Database
+
+**Qdrant**, a cloud-based vector database, was used to store embeddings for similarity search.
+
+### Configuration:
+- **Distance Metrics**: Euclidean distance for similarity retrieval.
+- **Indexing**: Embeddings paired with metadata (Section and URL).
+
+### Query Handling:
+1. Input text passed through `get_embedding` function.
+2. Generated embedding queried using **Qdrant's search function**.
+3. Results ranked based on smallest Euclidean distance.
+
+---
+
+## 5. User Interface and Result Display
+
+An interactive UI allows users to:
+- Enter text excerpts or queries.
+- Retrieve section numbers and ranked similar sections.
+- Access additional details, including URLs.
+
+**Advantages**:
+- Efficient legal research.
+- Contextualized retrieval supports decision-making processes.
+
+---
+
+## Conclusion
+
+By integrating web scraping, NLP-based data cleaning, LegalBERT embeddings, and vector search technology, this chatbot bridges the gap between complex legal texts and user-friendly query-based retrieval. It provides a robust tool for modern legal research, offering precision, accessibility, and enhanced decision-making.
+
