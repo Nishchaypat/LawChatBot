@@ -1,3 +1,4 @@
+#Sample Front end code
 from flask import Flask, render_template, request, jsonify
 from qdrant_client import QdrantClient
 from transformers import AutoTokenizer, AutoModel
