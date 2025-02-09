@@ -10,3 +10,4 @@ import faiss
 import os
 import json
 from tqdm import tqdm
+import dotenv
