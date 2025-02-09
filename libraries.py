@@ -9,3 +9,4 @@ from qdrant_client.http.models import VectorParams, Distance, Filter, SearchRequ
 import faiss
 import os
 import json
+from tqdm import tqdm
