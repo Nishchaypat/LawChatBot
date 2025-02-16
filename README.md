@@ -93,3 +93,10 @@ By integrating web scraping, NLP-based data cleaning, LegalBERT embeddings, and 
 
 **This approach was not an intended method for the research, but a stepping stone to an Advanced Agentic RAG application, projected to be made by March 2025.**
 
+
+
+
+Embedding Models tried:
+
+1. https://huggingface.co/edwatanabe/bert-large-cased-pt-law
+2. Gemini: Text-embedding-005
