@@ -100,3 +100,4 @@ Embedding Models tried:
 
 1. https://huggingface.co/edwatanabe/bert-large-cased-pt-law
 2. Gemini: Text-embedding-005
+3. https://huggingface.co/voyageai/voyage-3-m-exp
