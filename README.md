@@ -98,6 +98,6 @@ By integrating web scraping, NLP-based data cleaning, LegalBERT embeddings, and 
 
 Embedding Models tried:
 
-1. https://huggingface.co/edwatanabe/bert-large-cased-pt-law
+1. nlpaueb/legal-bert-base-uncased
 2. Gemini: Text-embedding-005
-3. https://huggingface.co/voyageai/voyage-law-2
+3. voyage-law-2
