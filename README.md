@@ -101,3 +101,17 @@ Embedding Models tried:
 1. nlpaueb/legal-bert-base-uncased
 2. Gemini: Text-embedding-005
 3. voyage-law-2
+
+Context length:
+
+1. Title18_processed_chapters: 40000 (avg: 16174)
+2. LCSC_chapters: 48963 (avg: 1913)
+3. RCTS_chapters: 999 (avg: 749)
+4. semchunk_chapters: 5567 (avg: 2816)
+
+   
+6. Title18_processed_pages: 5867 (avg: 3600)
+7. LCSC_pages: 45980 (avg: 1521)
+8. RCTS_pages: 1000 (avg: 879)
+9. semchunk_pages: 5059 (avg: 2692)
+   
