@@ -1,4 +1,4 @@
-# Premature and Brute Approach to RAG Application for a Law Article
+# Premature and Brute Approach to RAG Application for a Law Article 
 
 # Specs:
 
