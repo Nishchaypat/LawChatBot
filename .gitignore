@@ -1,4 +1,5 @@
 .env
+law_venv/
 /__pycache__
 /checkpoints
 gcpservicekey.json
