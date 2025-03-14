@@ -91,14 +91,6 @@ def generate_response(prompt,  query, data):
 '''
 Evaluation Code for Testing Purposes
 '''
-import time
-import pandas as pd
-
-import time
-import pandas as pd
-
-import time
-import pandas as pd
 
 def evaluation(queries):
     data = []  # List to store the data for the DataFrame
