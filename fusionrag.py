@@ -1,519 +1,107 @@
-import os
-import re
-import numpy as np
+from fusion import testing
 import pandas as pd
-import torch
-import torch.nn as nn
-from langchain_google_vertexai import VertexAIEmbeddings
-import vertexai
-import langchain
-import torch.nn.functional as F
-from transformers import AutoTokenizer, AutoModel
-from sklearn.metrics.pairwise import cosine_similarity
-import tiktoken
-import voyageai
-import math
-from tqdm import tqdm
-import pyarrow.parquet as pq
-import spacy
-from torch.utils.data import DataLoader, Dataset
-from vertexai.language_models import TextEmbeddingModel
-from torch import nn
 import google.generativeai as genai
-import json
-from typing import List, Dict, Union, Optional, Any
-from fuzzy import LegalQueryAnalyzer
-
-query_analyzer = LegalQueryAnalyzer(use_gemini=True)
+import os
 
 genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
 
-try:
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = r"C:\Users\mkolla1\LawChatBot\gcpservicekey.json"
-except:
-    print("Error at Try block")
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = r"gcpservicekey.json"
-    
-PROJECT_ID = "lawrag"
-LOCATION = "us-central1"
-vertexai.init(project=PROJECT_ID, location=LOCATION)
 
+# Load the embeddings files
+gemini_sections_df = pd.read_parquet(r"New_Embeddings_2025\sections\embeddings_gemini_text-005.parquet")
+gemini_pages_df = pd.read_parquet(r"New_Embeddings_2025\pages\embeddings_gemini_text-005_pages_semchunk.parquet")
+gemini_chapters_df = pd.read_parquet(r"New_Embeddings_2025\chapters\embeddings_gemini_text-005_chapters_semchunk.parquet")
 
-voyageai.api_key = os.getenv("VOYAGE_API")
+voyage_sections_df = pd.read_parquet(r"New_Embeddings_2025\sections\embeddings_voyage.parquet")
+voyage_pages_df = pd.read_parquet(r"New_Embeddings_2025\pages\embeddings_voyage_per_pages_semchunked.parquet")
+voyage_chapters_df = pd.read_parquet(r"New_Embeddings_2025\chapters\embeddings_voyage_per_chapter_semchunked.parquet")
 
-
-'''
-Embedding Generator class to generate embeddings using Gemini and VoyageAI models.
-'''
-
-class EmbeddingGenerator:
-    def __init__(self, gemini_model_name="text-embedding-005", voyage_model_name="voyage-law-2"):
-        """
-        Initializes the embedding generator with Gemini and VoyageAI models.
-        """
-        self.gemini_model = VertexAIEmbeddings(gemini_model_name)
-        self.voyage_model_name = voyage_model_name
-        self.voyage_client = voyageai.Client()
-        self.voyage_tockenizer=AutoTokenizer.from_pretrained('voyageai/voyage-2')
-        self.gemini_tockenizer=tiktoken.get_encoding("cl100k_base")
-
-    def chunk_text_gemini(self, text, max_tokens=4096, overlap=512):
-        tokens = self.gemini_tockenizer.encode(text)
-
-        chunks = []
-        start = 0
-        while start < len(tokens):
-            chunk = tokens[start:start + max_tokens]
-            chunks.append(self.gemini_tockenizer.decode(chunk))
-            start += max_tokens - overlap  # Sliding window
-        return chunks
-    
-    def chunk_text_voyage(self, text, max_tokens=4096, overlap=512):
-        """
-        Splits text into chunks based on the token limit of voyage-law-2 tokenizer.
-        Uses a sliding window approach with overlap.
-        
-        Args:
-            text (str): The input text to be chunked.
-            max_tokens (int): Maximum tokens per chunk (4096 for voyage-law-2).
-            overlap (int): Overlapping tokens to maintain context between chunks.
-
-        Returns:
-            list of str: List of text chunks.
-        """
-        tokens = self.voyage_tockenizer.encode(text, add_special_tokens=False)
-
-        chunks = []
-        start = 0
-        while start < len(tokens):
-            chunk = tokens[start:start + max_tokens]
-            chunks.append(self.voyage_tockenizer.decode(chunk))
-            start += max_tokens - overlap
-
-        return chunks
-    
-    def get_embeddings_gemini(self, texts, batch_size=32):
-        """
-        Compute embeddings using VertexAIEmbeddings in batches.
-
-        Args:
-            texts (list of str): List of text data to embed.
-            batch_size (int): Number of texts to process per batch.
-
-        Returns:
-            list: List of embedding vectors.
-        """
-        embeddings = []
-        texts= self.chunk_text_gemini(texts[0])
-        for i in tqdm(range(0, len(texts), batch_size), desc="Generating Embeddings"):
-            batch = texts[i:i + batch_size]  # Get batch of texts
-            batch_embeddings = self.gemini_model.embed_documents(batch)  # Generate embeddings
-            embeddings.extend(batch_embeddings)  # Store results
-
-        return embeddings
-
-    def get_embeddings_voyage(self, texts, batch_size=32):
-        """
-        Compute embeddings using the VoyageAI Python client in batches.
-
-        Args:
-            texts (list of str): List of text data to embed.
-            batch_size (int): Number of texts per batch.
-
-        Returns:
-            list: List of embedding vectors.
-        """
-        embeddings = []
-        texts= self.chunk_text_voyage(texts[0])
-        for i in range(0, len(texts), batch_size):
-            batch = texts[i:i + batch_size] 
-            
-            try:
-                response = self.voyage_client.embed(batch, model=self.voyage_model_name)
-                batch_embeddings = response.embeddings  
-                embeddings.extend(batch_embeddings)
-            except Exception as e:
-                print(f"Error processing batch {i // batch_size + 1}: {e}")
-
-        return embeddings
-
-
-'''
-Legal Embedding Loader class to load embeddings from parquet files for both models and all granularity levels.
-'''
-
-
-class LegalEmbeddingLoader:
-    """Loads embeddings from parquet files for both models and all granularity levels."""
-    
-    def __init__(self, base_path):
-        self.base_path = base_path
-        self.gemini_embeddings = {}
-        self.voyager_embeddings = {}
-        self.metadata = {}
-        
-    def load_embeddings(self):
-        """Load the six specified embedding files."""
-        file_mappings = {
-            "gemini_chapters": "embeddings_gemini_text-005_chapters_semchunk.parquet",
-            "voyager_chapters": "embeddings_voyage_per_chapter_semchunked.parquet",
-            "gemini_pages": "embeddings_gemini_text-005_pages_semchunk.parquet",
-            "voyager_pages": "embeddings_voyage_per_pages_semchunked.parquet",
-            "gemini_sections": "embeddings_gemini_text-005.parquet",
-            "voyager_sections": "embeddings_voyage.parquet",
-        }
-
-        for key, file_name in file_mappings.items():
-            print(self.base_path)
-            file_path = os.path.join(self.base_path, key.split("_")[-1], file_name)
-            print(file_path)
-            if not os.path.exists(file_path):
-                print(f"File {file_name} not found. Skipping...")
-                continue
-
-            # Read parquet file
-            table = pq.read_table(file_path)
-            df = table.to_pandas()
-            print(f"\nColumns in {file_name}: {df.columns.tolist()}")
-            # Extract embeddings and metadata
-            embeddings = np.stack(df["Embedding"].values)
-
-            # Determine model and granularity
-            model, granularity = key.split("_")
-
-            # Store embeddings
-            if model == "gemini":
-                self.gemini_embeddings[granularity] = torch.tensor(embeddings, dtype=torch.float32)
-            else:
-                self.voyager_embeddings[granularity] = torch.tensor(embeddings, dtype=torch.float32)
-
-            # Store metadata
-            self.metadata[key] = df.drop('Embedding', axis=1)
-
-            print(f"Loaded {file_name} ({model} - {granularity})")
-        return self.gemini_embeddings, self.voyager_embeddings, self.metadata
-
-    def get_embedding_dimensions(self):
-        """Return the dimensions of embeddings for both models."""
-        gemini_dim = {k: v.shape[1] for k, v in self.gemini_embeddings.items()}
-        voyager_dim = {k: v.shape[1] for k, v in self.voyager_embeddings.items()}
-        return gemini_dim, voyager_dim
-
-
-'''
-FusionRetrival class to perform document retrieval using the fusion of Gemini and VoyageAI embeddings.
-''' 
-
-class FusionRetrival(nn.Module):
-    def __init__(self, output_dim=1024, top_n=10):
-        super(FusionRetrival, self).__init__()
-        
-        self.output_dim = output_dim
-        self.top_n = top_n
-        self.granularities = ['sections', 'chapters', 'pages']
-
-        # Query projectors
-        self.gemini_query_projector = nn.Linear(768, 768)
-        self.voyager_query_projector = nn.Linear(1024, output_dim)
-        
-        # Document projectors
-        self.gemini_projector = nn.Linear(768, 768)
-        self.voyager_projector = nn.Linear(1024, output_dim)
-
-        # Aggregation
-        self.layer_norm = nn.LayerNorm(output_dim)
-
-
-    def forward(self, gemini_embeddings, voyager_embeddings, gemini_query_embedding, voyager_query_embedding):
-        # Compute cosine similarities directly without projections and normalizations
-        gemini_section_similarities = F.cosine_similarity(gemini_embeddings['sections'], gemini_query_embedding)
-        gemini_chapter_similarities = F.cosine_similarity(gemini_embeddings['chapters'], gemini_query_embedding)
-        gemini_page_similarities = F.cosine_similarity(gemini_embeddings['pages'], gemini_query_embedding)
-
-        voyager_section_similarities = F.cosine_similarity(voyager_embeddings['sections'], voyager_query_embedding)
-        voyager_chapter_similarities = F.cosine_similarity(voyager_embeddings['chapters'], voyager_query_embedding)
-        voyager_page_similarities = F.cosine_similarity(voyager_embeddings['pages'], voyager_query_embedding)
-
-        # Apply softmax to the similarity scores
-        gemini_section_weights = F.softmax(gemini_section_similarities, dim=0)
-        gemini_chapter_weights = F.softmax(gemini_chapter_similarities, dim=0)
-        gemini_page_weights = F.softmax(gemini_page_similarities, dim=0)
-
-        voyager_section_weights = F.softmax(voyager_section_similarities, dim=0)
-        voyager_chapter_weights = F.softmax(voyager_chapter_similarities, dim=0)
-        voyager_page_weights = F.softmax(voyager_page_similarities, dim=0)
-
-        print(f"Shape of gemini_section_weights: {gemini_section_weights.shape}")
-        print(f"Shape of voyager_section_weights: {voyager_section_weights.shape}")
-        print(f"Shape of gemini_chapter_weights: {gemini_chapter_weights.shape}")
-        print(f"Shape of voyager_chapter_weights: {voyager_chapter_weights.shape}")
-        print(f"Shape of gemini_page_weights: {gemini_page_weights.shape}")
-        print(f"Shape of voyager_page_weights: {voyager_page_weights.shape}")
-        # Get top N indices
-        gemini_section_top_values, gemini_section_top_indices = torch.topk(gemini_section_weights, self.top_n)
-        gemini_chapter_top_values, gemini_chapter_top_indices = torch.topk(gemini_chapter_weights, self.top_n)
-        gemini_page_top_values, gemini_page_top_indices = torch.topk(gemini_page_weights, self.top_n)
-
-        voyager_section_top_values, voyager_section_top_indices = torch.topk(voyager_section_weights, self.top_n)
-        voyager_chapter_top_values, voyager_chapter_top_indices = torch.topk(voyager_chapter_weights, self.top_n)
-        voyager_page_top_values, voyager_page_top_indices = torch.topk(voyager_page_weights, self.top_n)
-
-        # Store results in dictionary
-        top_indices_dict = {
-            'sections': {
-                "gemini_top_values": gemini_section_top_values,
-                "gemini_top_indices": gemini_section_top_indices,
-                "voyager_top_values": voyager_section_top_values,
-                "voyager_top_indices": voyager_section_top_indices
-            },
-            'chapters': {
-                "gemini_top_values": gemini_chapter_top_values,
-                "gemini_top_indices": gemini_chapter_top_indices,
-                "voyager_top_values": voyager_chapter_top_values,
-                "voyager_top_indices": voyager_chapter_top_indices
-            },
-            'pages': {
-                "gemini_top_values": gemini_page_top_values,
-                "gemini_top_indices": gemini_page_top_indices,
-                "voyager_top_values": voyager_page_top_values,
-                "voyager_top_indices": voyager_page_top_indices
-            }
-        }
-
-        return {
-            'top_indices': top_indices_dict
-        }
-
-    def forward1(self, gemini_embeddings, voyager_embeddings, gemini_query_embedding, voyager_query_embedding):
-        # Project query embeddings
-        gemini_query_embedding = gemini_query_embedding.unsqueeze(0)
-        voyager_query_embedding = voyager_query_embedding.unsqueeze(0)
-        print(f"gemini_query_embedding: {gemini_query_embedding.shape}")
-        print(f"voyager_query_embedding: {voyager_query_embedding.shape}")
-        gemini_query_projected = self.gemini_query_projector(gemini_query_embedding)
-        voyager_query_projected = self.voyager_query_projector(voyager_query_embedding)
-
-        # Normalize query embeddings
-        gemini_query_norm = F.normalize(gemini_query_projected, p=2, dim=1)
-        voyager_query_norm = F.normalize(voyager_query_projected, p=2, dim=1)
-        
-        # Process embeddings per granularity
-        gemini_section_proj = self.gemini_projector(gemini_embeddings['sections'])
-        gemini_chapter_proj = self.gemini_projector(gemini_embeddings['chapters'])
-        gemini_page_proj = self.gemini_projector(gemini_embeddings['pages'])
-
-        voyager_section_proj = self.voyager_projector(voyager_embeddings['sections'])
-        voyager_chapter_proj = self.voyager_projector(voyager_embeddings['chapters'])
-        voyager_page_proj = self.voyager_projector(voyager_embeddings['pages'])
-
-        gemini_section_proj = gemini_embeddings['sections']
-        gemini_chapter_proj = gemini_embeddings['chapters']
-        gemini_page_proj = gemini_embeddings['pages']
-
-        voyager_section_proj = voyager_embeddings['sections']
-        voyager_chapter_proj = voyager_embeddings['chapters']
-        voyager_page_proj = voyager_embeddings['pages']
-
-        # Normalize document embeddings
-        gemini_section_norm = F.normalize(gemini_section_proj, p=2, dim=1)
-        gemini_chapter_norm = F.normalize(gemini_chapter_proj, p=2, dim=1)
-        gemini_page_norm = F.normalize(gemini_page_proj, p=2, dim=1)
-
-        voyager_section_norm = F.normalize(voyager_section_proj, p=2, dim=1)
-        voyager_chapter_norm = F.normalize(voyager_chapter_proj, p=2, dim=1)
-        voyager_page_norm = F.normalize(voyager_page_proj, p=2, dim=1)
-        
-
-        # Compute cosine similarity using matrix multiplication
-        gemini_section_similarities = torch.matmul(gemini_section_norm, gemini_query_norm.T).squeeze(1)
-        gemini_chapter_similarities = torch.matmul(gemini_chapter_norm, gemini_query_norm.T).squeeze(1)
-        gemini_page_similarities = torch.matmul(gemini_page_norm, gemini_query_norm.T).squeeze(1)
-
-        voyager_section_similarities = torch.matmul(voyager_section_norm, voyager_query_norm.T).squeeze(1)
-        voyager_chapter_similarities = torch.matmul(voyager_chapter_norm, voyager_query_norm.T).squeeze(1)
-        voyager_page_similarities = torch.matmul(voyager_page_norm, voyager_query_norm.T).squeeze(1)
-
-
-        # Apply softmax
-        gemini_section_weights = F.softmax(gemini_section_similarities, dim=0)
-        gemini_chapter_weights = F.softmax(gemini_chapter_similarities, dim=0)
-        gemini_page_weights = F.softmax(gemini_page_similarities, dim=0)
-
-        voyager_section_weights = F.softmax(voyager_section_similarities, dim=0)
-        voyager_chapter_weights = F.softmax(voyager_chapter_similarities, dim=0)
-        voyager_page_weights = F.softmax(voyager_page_similarities, dim=0)
-
-        print(f"Shape of gemini_section_weights: {gemini_section_weights.shape}")
-        print(f"Shape of voyager_section_weights: {voyager_section_weights.shape}")
-        print(f"Shape of gemini_chapter_weights: {gemini_chapter_weights.shape}")
-        print(f"Shape of voyager_chapter_weights: {voyager_chapter_weights.shape}")
-        print(f"Shape of gemini_page_weights: {gemini_page_weights.shape}")
-        print(f"Shape of voyager_page_weights: {voyager_page_weights.shape}")
-        # Get top N indices
-        gemini_section_top_values, gemini_section_top_indices = torch.topk(gemini_section_weights, self.top_n)
-        gemini_chapter_top_values, gemini_chapter_top_indices = torch.topk(gemini_chapter_weights, self.top_n)
-        gemini_page_top_values, gemini_page_top_indices = torch.topk(gemini_page_weights, self.top_n)
-
-        voyager_section_top_values, voyager_section_top_indices = torch.topk(voyager_section_weights, self.top_n)
-        voyager_chapter_top_values, voyager_chapter_top_indices = torch.topk(voyager_chapter_weights, self.top_n)
-        voyager_page_top_values, voyager_page_top_indices = torch.topk(voyager_page_weights, self.top_n)
-
-        # Store results in dictionary
-        top_indices_dict = {
-            'sections': {
-                "gemini_top_values": gemini_section_top_values,
-                "gemini_top_indices": gemini_section_top_indices,
-                "voyager_top_values": voyager_section_top_values,
-                "voyager_top_indices": voyager_section_top_indices
-            },
-            'chapters': {
-                "gemini_top_values": gemini_chapter_top_values,
-                "gemini_top_indices": gemini_chapter_top_indices,
-                "voyager_top_values": voyager_chapter_top_values,
-                "voyager_top_indices": voyager_chapter_top_indices
-            },
-            'pages': {
-                "gemini_top_values": gemini_page_top_values,
-                "gemini_top_indices": gemini_page_top_indices,
-                "voyager_top_values": voyager_page_top_values,
-                "voyager_top_indices": voyager_page_top_indices
-            }
-        }
-        print("FINAL")
-        return {
-            'top_indices': top_indices_dict
-        }
-
-
-
-
-
-
-def remove_duplicates(top_indices_dict):
+def get_processed_content_by_index(index, source, model):
     """
-    Removes duplicate indices within each granularity (sections, chapters, pages)
-    while keeping the one with the higher value. If values are equal, remove from Gemini.
-    """
-    for granularity in top_indices_dict:
-        gemini_indices = [int(idx.item()) if hasattr(idx, 'item') else int(idx) for idx in top_indices_dict[granularity]["gemini_top_indices"]]
-        gemini_values = [float(val.item()) if hasattr(val, 'item') else float(val) for val in top_indices_dict[granularity]["gemini_top_values"]]
-        voyager_indices = [int(idx.item()) if hasattr(idx, 'item') else int(idx) for idx in top_indices_dict[granularity]["voyager_top_indices"]]
-        voyager_values = [float(val.item()) if hasattr(val, 'item') else float(val) for val in top_indices_dict[granularity]["voyager_top_values"]]
-        
-        gemini_map = {idx: val for idx, val in zip(gemini_indices, gemini_values)}
-        voyager_map = {idx: val for idx, val in zip(voyager_indices, voyager_values)}
-        
-        # Identify duplicates and remove based on the given rule
-        common_indices = set(gemini_map.keys()).intersection(set(voyager_map.keys()))
-        for idx in common_indices:
-            if gemini_map[idx] > voyager_map[idx]:
-                del voyager_map[idx]
-            else:
-                del gemini_map[idx]
-        
-        # Update lists after processing
-        top_indices_dict[granularity]["gemini_top_indices"] = list(gemini_map.keys())
-        top_indices_dict[granularity]["gemini_top_values"] = list(gemini_map.values())
-        top_indices_dict[granularity]["voyager_top_indices"] = list(voyager_map.keys())
-        top_indices_dict[granularity]["voyager_top_values"] = list(voyager_map.values())
-    
-    return top_indices_dict
+    Retrieve the Processed_Content or chunk based on the specified index and source.
 
-def get_weighted_indices(top_indices_dict, gemini_weight, voyager_weight):
-    """
-    Selects a weighted number of indices based on provided weights.
-    """
-    for granularity in top_indices_dict:
-        gemini_indices = top_indices_dict[granularity]["gemini_top_indices"]
-        gemini_values = top_indices_dict[granularity]["gemini_top_values"]
-        voyager_indices = top_indices_dict[granularity]["voyager_top_indices"]
-        voyager_values = top_indices_dict[granularity]["voyager_top_values"]
-        
-        num_gemini = math.ceil(len(gemini_indices) * gemini_weight)
-        num_voyager = math.ceil(len(voyager_indices) * voyager_weight)
-        
-        top_indices_dict[granularity]["gemini_top_indices"] = gemini_indices[:num_gemini]
-        top_indices_dict[granularity]["gemini_top_values"] = gemini_values[:num_gemini]
-        top_indices_dict[granularity]["voyager_top_indices"] = voyager_indices[:num_voyager]
-        top_indices_dict[granularity]["voyager_top_values"] = voyager_values[:num_voyager]
-    
-    print("FINAL")
-    return {
-        'top_indices': top_indices_dict
-    }
-
-
-
-
-'''
-
-Complete RAG class to perform document retrieval using the fusion of Gemini and VoyageAI embeddings.
-'''
-
-
-
-def testing(base_path, query, forward_fn, filter_fn, weights):
-    """
-    Test function for MultiLevelAttention model using real embeddings from saved files.
-    
     Args:
-        base_path (str): Path to the directory containing embedding parquet files.
-        query_embedding (torch.Tensor): Query embedding tensor with shape [768].
-    
+        index (int): The row index to retrieve.
+        source (str): The source dataset ("gemini_text", "gemini_pages", or "voyage").
+
     Returns:
-        None
+        str: The corresponding Processed_Content or chunk.
     """
-    global output
-    # Load embeddings
-    loader = LegalEmbeddingLoader(base_path)
-    gemini_embeddings, voyager_embeddings, metadata = loader.load_embeddings()
+    if model== "gemini":
+        if source == "sections":
+            return gemini_sections_df.loc[index, "Processed_Content"] if index in gemini_sections_df.index else None
+        elif source == "pages":
+            return gemini_pages_df.loc[index, "chunk"] if index in gemini_pages_df.index else None
+        elif source == "chapters":
+            return gemini_chapters_df.loc[index, "chunk"] if index in gemini_chapters_df.index else None
+        else:
+            return "Invalid source specified."
+    if model == "voyage":
+        if source == "sections":
+            return voyage_sections_df.loc[index, "Processed_Content"] if index in voyage_sections_df.index else None
+        elif source == "pages":
+            return voyage_pages_df.loc[index, "chunk"] if index in voyage_pages_df.index else None
+        elif source == "chapters":
+            return voyage_chapters_df.loc[index, "chunk"] if index in voyage_chapters_df.index else None
+        else:
+            return "Invalid source specified."
+        
 
-    # Initialize the model
-    model = FusionRetrival(output_dim=1024)
+base_path = "New_Embeddings_2025" 
+query = """If someone knowingly transports a person they know to be a terrorist on a vessel within the U.S., on waters under U.S. jurisdiction, or on a U.S. vessel on the high seas, what are the potential penalties? Also, how is 'terrorist' defined in this context?
+"""
+results= testing(base_path, query, forward_fn="", filter_fn= True)
+print(results)
 
-    # Analyze query
-    # query_analyzer = LegalQueryAnalyzer()
-    # query_output = query_analyzer.analyze_query(str(query))
-    embedder = EmbeddingGenerator()
-    gemini_query_embeddings= embedder.get_embeddings_gemini([query])
-    voyage_query_embeddings= embedder.get_embeddings_voyage([query])
-    query_output = {'gemini_embedding': gemini_query_embeddings[0], 'voyage_embedding': voyage_query_embeddings[0]}
-    print("********************************")
-    # Run the model
-    if forward_fn == "simple":
-        output = model.forward(
-            gemini_embeddings, 
-            voyager_embeddings, 
-            torch.tensor(query_output['voyage_embedding']),
-            torch.tensor(query_output['voyage_embedding'])
-        )
+structured_data = {
+    "sections": {
+        "gemini": list(map(lambda x: get_processed_content_by_index(x, 'sections','gemini' ), results['top_indices']['sections']['gemini_top_indices'])),
+        "voyage": list(map(lambda x: get_processed_content_by_index(x, 'sections','voyage'), results['top_indices']['sections']['voyager_top_indices'])),
+    },
+    "chapters": {
+        "gemini": list(map(lambda x: get_processed_content_by_index(x, 'chapters', 'gemini'), results['top_indices']['chapters']['gemini_top_indices'])),
+        "voyage": list(map(lambda x: get_processed_content_by_index(x, 'chapters', 'voyage'), results['top_indices']['chapters']['voyager_top_indices'])),
+    },
+    "pages": {
+        "gemini": list(map(lambda x: get_processed_content_by_index(x, 'pages', 'gemini'), results['top_indices']['pages']['gemini_top_indices'])),
+        "voyage": list(map(lambda x: get_processed_content_by_index(x, 'pages', 'voyage'), results['top_indices']['pages']['voyager_top_indices'])),
+    }
+}
+
+print(structured_data)
+prompt= """You are a highly specialized legal expert and research assistant. Your expertise is strictly confined to legal principles, case law, statutes, and regulatory frameworks. You possess a deep understanding of legal terminology and can accurately interpret complex legal information.
+
+Your primary function is to provide precise and concise answers to legal questions based on the provided context. You will first retrieve relevant information from the provided legal documents and then synthesize a response that directly addresses the user's query.
+
+**Instructions:**
+
+1.  **Contextual Analysis:** Carefully analyze the provided legal documents, including data from various sections, pages, and chapters of the two distinct models, to understand the relevant facts, legal principles, and applicable laws.
+2.  **Information Retrieval:** Extract the maximum amount of information directly pertinent to the user's question from all provided sections, pages, and chapters of both models.
+3.  **Cross-Model Integration:** If the two models provide differing or complementary information on the same legal issue, integrate these perspectives into a coherent and comprehensive response.
+4.  **Synthesis and Response:** Formulate a clear, accurate, and concise answer using the retrieved information. Cite specific legal sources (e.g., case names, statute sections, model names, page numbers) when applicable.
+5.  **Clarity and Precision:** Use precise legal terminology and avoid jargon whenever possible. If complex terminology is necessary, provide a brief explanation.
+6.  **No Extrapolation:** Do not make assumptions or extrapolate beyond the information contained in the provided context. Only answer based on the context.
+7.  **No personal opinions:** Do not provide personal opinions or legal advice. Only provide information based on the law.
+
+** Input Data Type:**
+The input data consists of structured information extracted from two distinct models (Gemini and Voyage) that includes sections, pages, and chapters relevant to the legal question in dictionary format. Here is the data {data_here}
+
+**Task:**
+
+Answer the following legal question based on the provided content: {query_here}
+"""
+
+def generate_response(prompt,  query, data):
+    model = genai.GenerativeModel('models/gemini-2.0-flash',
+                              system_instruction=prompt.format(query_here=query, data_here=data),
+                                )
+    response = model.generate_content("Please provide a concise and accurate response based on the provided legal documents and query.")
+    if response:
+        return response.text
     else:
-        output = model.forward1(
-            gemini_embeddings, 
-            voyager_embeddings, 
-            torch.tensor(query_output['gemini_embedding']),
-            torch.tensor(query_output['voyage_embedding'])
-        )
-    
-    for granularity, data in output['top_indices'].items():
-        print(f"\n--- {granularity.capitalize()} ---")
-        print(f"Gemini Top Indices: {data['gemini_top_indices']} GEMINI TOP VALUES: {data['gemini_top_values']}")
-        print(f"Voyager Top Indices: {data['voyager_top_indices']} VOYAGER TOP VALUES: {data['voyager_top_values']}")
-    # print("AFTER Processing and WEIGHTED")
+        return "No response generated. Please check the input data or model configuration."
 
-    cleaned_top_indices = remove_duplicates(output['top_indices'])
-    final_indices = get_weighted_indices(cleaned_top_indices, weights['gemini'], weights['gemini'])
-    print(final_indices)
-    for granularity, data in final_indices['top_indices'].items():
-        print(f"\n--- {granularity.capitalize()} ---")
-        print(f"Gemini Top Indices: {data['gemini_top_indices']} GEMINI TOP VALUES: {data['gemini_top_values']}")
-        print(f"Voyager Top Indices: {data['voyager_top_indices']} VOYAGER TOP VALUES: {data['voyager_top_values']}")
-
-    if filter_fn:
-        return output
-    else:
-        return final_indices
-# base_path = "New_Embeddings_2025" 
-# query = """Can a vessel be seized and forfeited to the United States if the owner or master knowingly allows it to be used for conspiring against the United States?
-# """
-# testing(base_path, query, forward_fn="", filter_fn= True, weights={'gemini': 0.3, 'voyager': 0.7})
+print("#################################################################################################")
+print("Gemini Response:")
+gemini_response = generate_response(prompt, query, structured_data)
+print(gemini_response)
+print("#################################################################################################")
