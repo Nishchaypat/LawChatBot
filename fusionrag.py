@@ -91,8 +91,18 @@ def generate_response(prompt,  query, data):
 '''
 Evaluation Code for Testing Purposes
 '''
+import time
+import pandas as pd
+
+import time
+import pandas as pd
+
+import time
+import pandas as pd
+
 def evaluation(queries):
     data = []  # List to store the data for the DataFrame
+    times = []  # List to store the time taken for each loop
     for query in queries:
         start_time = time.time()  # Record the start time
         
@@ -114,7 +124,16 @@ def evaluation(queries):
             }
         }
         
-        gemini_response = generate_response(prompt, query, structured_data)
+        error_message = ""  # Initialize an empty string for error message
+        
+        try:
+            # Try generating the response
+            gemini_response = generate_response(prompt, query, structured_data)
+        except ValueError as e:
+            # Handle the ValueError if the response contains invalid content
+            print(f"Error generating response for query '{query}': {str(e)}")
+            gemini_response = "Error: Response could not be generated."
+            error_message = str(e)  # Store the error message for this query
         
         end_time = time.time()  # Record the end time
         time_taken = end_time - start_time  # Calculate the time taken for this loop
@@ -126,12 +145,32 @@ def evaluation(queries):
             "Voyager Weights": results['voyager_weight'],
             "Results": results['top_indices'],
             "Gemini Response": gemini_response,
-            "Time Taken (seconds)": time_taken
+            "Time Taken (seconds)": time_taken,
+            "Error Message": error_message  # Add error message to the data
         })
+        
+        # Store the time for each iteration
+        times.append(time_taken)
     
     # Create the DataFrame from the collected data
     df = pd.DataFrame(data)
-    df.to_csv(r"Evaluation_Results.csv")
+    
+    # Calculate average, max, and min times
+    avg_time = sum(times) / len(times) if times else 0
+    max_time = max(times) if times else 0
+    min_time = min(times) if times else 0
+    
+    # Add the calculated times to the DataFrame (if you want to show them in the DataFrame as well)
+    df['Average Time'] = avg_time
+    df['Max Time'] = max_time
+    df['Min Time'] = min_time
+    
+    # Save the DataFrame to CSV
+    df.to_csv(r"Evaluation_Results.csv", index=False)
+    
+    print(f"Successfully Done with Evaluation\nAverage Time: {avg_time:.4f}s\nMax Time: {max_time:.4f}s\nMin Time: {min_time:.4f}s")
+
+
 
 
 
@@ -167,10 +206,36 @@ def LegalChatBot(query):
 
 
 # test here
-query = """Can a crime victim seek advice from an attorney regarding their rights, as described in subsection (a)?"""
-LegalChatBot(query)
+# query = """Can a crime victim seek advice from an attorney regarding their rights, as described in subsection (a)?"""
+# LegalChatBot(query)
 
 
+# Evaluation Here
+queries = [
+    "Can a vessel be seized and forfeited to the United States if it is used for conspiring against the U.S. government under Title 18?",
+    "What are the penalties for attempting to influence, intimidate, or obstruct a federal officer in violation of Title 18?",
+    "Under what conditions can DNA testing be ordered in criminal cases involving violent crimes, and how should the results be handled?",
+    "What constitutes 'economic damage' under Title 18, and how is it calculated for sentencing purposes?",
+    "What are the legal implications of possessing a firearm as a convicted felon under Title 18, particularly after May 19, 1986?",
+    "What penalties are associated with the unauthorized use of a communication device in the commission of a federal crime under Title 18?",
+    "Under Title 18, what specific actions constitute witness tampering and what penalties can individuals face for this crime?",
+    "How does Title 18 define 'serious bodily injury' in the context of federal crimes?",
+    "What legal standards must be met to seize and forfeit property connected to organized crime under Title 18?",
+    "What are the penalties for a person who knowingly transports a person engaged in terrorism, according to Title 18?",
+    "How does Title 18 address the legal consequences of harboring or aiding a fugitive who has committed a federal crime?",
+    "Under Title 18, what actions are considered obstruction of justice and what are the penalties associated with this offense?",
+    "What are the specific penalties for committing arson on federal property under Title 18?",
+    "How does Title 18 address crimes related to terrorism, including the provision of material support to terrorist organizations?",
+    "What is the definition of 'animal enterprise' under Title 18, and what are the legal consequences of violating these provisions?",
+    "What steps must law enforcement take to ensure compliance with federal wiretap laws under Title 18?",
+    "How does Title 18 address the criminal offense of human trafficking and what are the penalties associated with this crime?",
+    "Under Title 18, what is the legal procedure for conducting wiretaps and how is evidence obtained through these methods handled in court?",
+    "What actions are prohibited under Title 18 in cases of fraud involving federal programs or funds?",
+    "How does Title 18 define and regulate 'racketeering' and 'organized crime,' and what are the penalties for those convicted under these statutes?"
+]
+
+
+evaluation(queries)
 
 
 
