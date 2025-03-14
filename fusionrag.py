@@ -2,6 +2,7 @@ from fusion import testing
 import pandas as pd
 import google.generativeai as genai
 import os
+import time
 
 genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
 
@@ -88,11 +89,61 @@ def generate_response(prompt,  query, data):
 
 
 '''
+Evaluation Code for Testing Purposes
+'''
+def evaluation(queries):
+    data = []  # List to store the data for the DataFrame
+    for query in queries:
+        start_time = time.time()  # Record the start time
+        
+        base_path = "New_Embeddings_2025" 
+        results = testing(base_path, query, forward_fn="Advanced", filter_fn=True)
+        
+        structured_data = {
+            "sections": {
+                "gemini": list(map(lambda x: get_processed_content_by_index(x, 'sections', 'gemini'), results['top_indices']['sections']['gemini_top_indices'])),
+                "voyage": list(map(lambda x: get_processed_content_by_index(x, 'sections', 'voyage'), results['top_indices']['sections']['voyager_top_indices'])),
+            },
+            "chapters": {
+                "gemini": list(map(lambda x: get_processed_content_by_index(x, 'chapters', 'gemini'), results['top_indices']['chapters']['gemini_top_indices'])),
+                "voyage": list(map(lambda x: get_processed_content_by_index(x, 'chapters', 'voyage'), results['top_indices']['chapters']['voyager_top_indices'])),
+            },
+            "pages": {
+                "gemini": list(map(lambda x: get_processed_content_by_index(x, 'pages', 'gemini'), results['top_indices']['pages']['gemini_top_indices'])),
+                "voyage": list(map(lambda x: get_processed_content_by_index(x, 'pages', 'voyage'), results['top_indices']['pages']['voyager_top_indices'])),
+            }
+        }
+        
+        gemini_response = generate_response(prompt, query, structured_data)
+        
+        end_time = time.time()  # Record the end time
+        time_taken = end_time - start_time  # Calculate the time taken for this loop
+        
+        # Append the data for the current query
+        data.append({
+            "Query": query,
+            "Gemini Weights": results['gemini_weight'],
+            "Voyager Weights": results['voyager_weight'],
+            "Results": results['top_indices'],
+            "Gemini Response": gemini_response,
+            "Time Taken (seconds)": time_taken
+        })
+    
+    # Create the DataFrame from the collected data
+    df = pd.DataFrame(data)
+    df.to_csv(r"Evaluation_Results.csv")
+
+
+
+
+'''
 Final Function to retrive the indices, text, and generate response
 '''
 def LegalChatBot(query):
     base_path = "New_Embeddings_2025" 
     results= testing(base_path, query, forward_fn="Advanced", filter_fn= True)
+    print(f"Weights of Gemini: {results['gemini_weight']}")
+    print(f"Weights of Voyage: {results['voyager_weight']}")
     structured_data = {
     "sections": {
         "gemini": list(map(lambda x: get_processed_content_by_index(x, 'sections','gemini' ), results['top_indices']['sections']['gemini_top_indices'])),
@@ -112,7 +163,14 @@ def LegalChatBot(query):
     gemini_response = generate_response(prompt, query, structured_data)
     print(gemini_response)
     print("#################################################################################################")
-    #return gemini_response
+    return gemini_response
 
-query = """Can you explain the rules regarding venue in federal criminal procedure?"""
+
+# test here
+query = """Can a crime victim seek advice from an attorney regarding their rights, as described in subsection (a)?"""
 LegalChatBot(query)
+
+
+
+
+
