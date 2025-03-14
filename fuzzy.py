@@ -1,3 +1,6 @@
+import re
+import tiktoken
+
 class LegalQueryAnalyzer:
     """
     Advanced legal query analyzer using fuzzy logic to determine query intent and optimize 
@@ -604,4 +607,3 @@ class LegalQueryAnalyzer:
 
     
 
-analyzer = LegalQueryAnalyzer(use_gemini=True)
