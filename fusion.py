@@ -602,18 +602,21 @@ def testing(base_path, query, forward_fn, filter_fn):
         print(f"Voyager Top Indices: {data['voyager_top_indices']} VOYAGER TOP VALUES: {data['voyager_top_values']}")
     # print("AFTER Processing and WEIGHTED")
 
-    cleaned_top_indices = remove_duplicates(output['top_indices'])
-    final_indices = get_weighted_indices(cleaned_top_indices, query_weights['weights']['gemini'], query_weights['weights']['voyager'])
-    print(final_indices)
-    for granularity, data in final_indices['top_indices'].items():
-        print(f"\n--- {granularity.capitalize()} ---")
-        print(f"Gemini Top Indices: {data['gemini_top_indices']} GEMINI TOP VALUES: {data['gemini_top_values']}")
-        print(f"Voyager Top Indices: {data['voyager_top_indices']} VOYAGER TOP VALUES: {data['voyager_top_values']}")
+    
 
     if filter_fn:
-        return output
+        cleaned_top_indices = remove_duplicates(output['top_indices'])
+        final_indices = get_weighted_indices(cleaned_top_indices, query_weights['weights']['gemini'], query_weights['weights']['voyager'])
+        print(final_indices)
+        for granularity, data in final_indices['top_indices'].items():
+            print(f"\n--- {granularity.capitalize()} ---")
+            print(f"Gemini Top Indices: {data['gemini_top_indices']} GEMINI TOP VALUES: {data['gemini_top_values']}")
+            print(f"Voyager Top Indices: {data['voyager_top_indices']} VOYAGER TOP VALUES: {data['voyager_top_values']}")
+        weights = {'gemini_weight': query_weights['weights']['gemini'], 'voyager_weight': query_weights['weights']['voyager']}
+        final_output = {**final_indices, **weights}
+        return final_output
     else:
-        return final_indices
+        return output
 # base_path = "New_Embeddings_2025" 
 # query = """Can a vessel be seized and forfeited to the United States if the owner or master knowingly allows it to be used for conspiring against the United States?
 # """
