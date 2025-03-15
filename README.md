@@ -115,4 +115,16 @@ Context length:
 7. LCSC_pages: 45980 (avg: 1521)
 8. RCTS_pages: 1000 (avg: 879)
 9. semchunk_pages: 5059 (avg: 2692)
+
+---
+
+1. Average response time,6.36
+2. Average query length,636.83
+3. Average response length,1533.98
+4. Average gemini weight,0.2936
+5. Average voyage weight,0.7064
+
+---
+
+
    
