@@ -2,19 +2,33 @@ from fusion import testing
 import pandas as pd
 import google.generativeai as genai
 import os
+import csv
 import time
+from dotenv import load_dotenv
+import warnings
+from transformers import logging
+from tqdm import tqdm
+from google.api_core.exceptions import DeadlineExceeded
+
+logging.set_verbosity_error()
+warnings.filterwarnings("ignore")
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+os.environ["TQDM_DISABLE"] = "true"
+
+
+load_dotenv()
 
 genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
 
 
 # Load the embeddings files
-gemini_sections_df = pd.read_parquet(r"New_Embeddings_2025\sections\embeddings_gemini_text-005.parquet")
-gemini_pages_df = pd.read_parquet(r"New_Embeddings_2025\pages\embeddings_gemini_text-005_pages_semchunk.parquet")
-gemini_chapters_df = pd.read_parquet(r"New_Embeddings_2025\chapters\embeddings_gemini_text-005_chapters_semchunk.parquet")
+gemini_sections_df = pd.read_parquet("/Users/npatel237/LawChatBot/New_Embeddings_2025/sections/embeddings_gemini_text-005.parquet")
+gemini_pages_df = pd.read_parquet("/Users/npatel237/LawChatBot/New_Embeddings_2025/pages/embeddings_gemini_text-005_pages_semchunk.parquet")
+gemini_chapters_df = pd.read_parquet("/Users/npatel237/LawChatBot/New_Embeddings_2025/chapters/embeddings_gemini_text-005_chapters_semchunk.parquet")
 
-voyage_sections_df = pd.read_parquet(r"New_Embeddings_2025\sections\embeddings_voyage.parquet")
-voyage_pages_df = pd.read_parquet(r"New_Embeddings_2025\pages\embeddings_voyage_per_pages_semchunked.parquet")
-voyage_chapters_df = pd.read_parquet(r"New_Embeddings_2025\chapters\embeddings_voyage_per_chapter_semchunked.parquet")
+voyage_sections_df = pd.read_parquet("/Users/npatel237/LawChatBot/New_Embeddings_2025/sections/embeddings_voyage.parquet")
+voyage_pages_df = pd.read_parquet("/Users/npatel237/LawChatBot/New_Embeddings_2025/pages/embeddings_voyage_per_pages_semchunked.parquet")
+voyage_chapters_df = pd.read_parquet("/Users/npatel237/LawChatBot/New_Embeddings_2025/chapters/embeddings_voyage_per_chapter_semchunked.parquet")
 
 '''
 Retriving the Content based on the Indices retrived from the Retrival process
@@ -51,7 +65,7 @@ def get_processed_content_by_index(index, source, model):
 
 
 
-# print(structured_data)
+# #print(structured_data)
 prompt= """You are a highly specialized legal expert and research assistant. Your expertise is strictly confined to legal principles, case law, statutes, and regulatory frameworks. You possess a deep understanding of legal terminology and can accurately interpret complex legal information.
 
 Your primary function is to provide precise and concise answers to legal questions based on the provided context. You will first retrieve relevant information from the provided legal documents and then synthesize a response that directly addresses the user's query.
@@ -92,76 +106,178 @@ def generate_response(prompt,  query, data):
 Evaluation Code for Testing Purposes
 '''
 
-def evaluation(queries):
-    data = []  # List to store the data for the DataFrame
-    times = []  # List to store the time taken for each loop
-    for query in queries:
-        start_time = time.time()  # Record the start time
+# def evaluation(queries):
+#     data = []  # List to store the data for the DataFrame
+#     times = []  # List to store the time taken for each loop
+#     i = 1
+#     for query in tqdm(queries, disable=True):
+#         print('Doing the query', i, 'out of', len(queries))
+#         i+=1
+#         start_time = time.time()  # Record the start time
         
-        base_path = "New_Embeddings_2025" 
-        results = testing(base_path, query, forward_fn="Advanced", filter_fn=True)
+#         base_path = "New_Embeddings_2025" 
+#         results = testing(base_path, query, forward_fn="Advanced", filter_fn=True)
         
+#         structured_data = {
+#             "sections": {
+#                 "gemini": list(map(lambda x: get_processed_content_by_index(x, 'sections', 'gemini'), results['top_indices']['sections']['gemini_top_indices'])),
+#                 "voyage": list(map(lambda x: get_processed_content_by_index(x, 'sections', 'voyage'), results['top_indices']['sections']['voyager_top_indices'])),
+#             },
+#             "chapters": {
+#                 "gemini": list(map(lambda x: get_processed_content_by_index(x, 'chapters', 'gemini'), results['top_indices']['chapters']['gemini_top_indices'])),
+#                 "voyage": list(map(lambda x: get_processed_content_by_index(x, 'chapters', 'voyage'), results['top_indices']['chapters']['voyager_top_indices'])),
+#             },
+#             "pages": {
+#                 "gemini": list(map(lambda x: get_processed_content_by_index(x, 'pages', 'gemini'), results['top_indices']['pages']['gemini_top_indices'])),
+#                 "voyage": list(map(lambda x: get_processed_content_by_index(x, 'pages', 'voyage'), results['top_indices']['pages']['voyager_top_indices'])),
+#             }
+#         }
+        
+#         error_message = ""  # Initialize an empty string for error message
+        
+#         try:
+#             # Try generating the response
+#             gemini_response = generate_response(prompt, query, structured_data)
+#         except ValueError as e:
+#             # Handle the ValueError if the response contains invalid content
+#             #print(f"Error generating response for query '{query}': {str(e)}")
+#             gemini_response = "Error: Response could not be generated."
+#             error_message = str(e)  # Store the error message for this query
+        
+#         end_time = time.time()  # Record the end time
+#         time_taken = end_time - start_time  # Calculate the time taken for this loop
+        
+#         # Append the data for the current query
+#         data.append({
+#             "Query": query,
+#             "Gemini Weights": results['gemini_weight'],
+#             "Voyager Weights": results['voyager_weight'],
+#             "Results": results['top_indices'],
+#             "Gemini Response": gemini_response,
+#             "Time Taken (seconds)": time_taken,
+#             "Error Message": error_message  # Add error message to the data
+#         })
+        
+#         # Store the time for each iteration
+#         times.append(time_taken)
+    
+#     # Create the DataFrame from the collected data
+#     df = pd.DataFrame(data)
+    
+#     # Calculate average, max, and min times
+#     avg_time = sum(times) / len(times) if times else 0
+#     max_time = max(times) if times else 0
+#     min_time = min(times) if times else 0
+    
+#     # Add the calculated times to the DataFrame (if you want to show them in the DataFrame as well)
+#     df['Average Time'] = avg_time
+#     df['Max Time'] = max_time
+#     df['Min Time'] = min_time
+    
+#     # Save the DataFrame to CSV
+#     df.to_csv(r"Evaluation_Results_2.csv", index=False)
+    
+    #print(f"Successfully Done with Evaluation\nAverage Time: {avg_time:.4f}s\nMax Time: {max_time:.4f}s\nMin Time: {min_time:.4f}s")
+
+def evaluation(queries, csv_path="Evaluation_Results_2.csv"):
+    # Define header columns for the CSV
+    header = [
+        "Query", 
+        "Gemini Weights", 
+        "Voyager Weights", 
+        "Results", 
+        "Gemini Response", 
+        "Time Taken (seconds)", 
+        "Error Message"
+    ]
+    
+    # Create the CSV file with headers if it doesn't already exist
+    if not os.path.exists(csv_path):
+        with open(csv_path, mode="w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=header)
+            writer.writeheader()
+    
+    # For timing statistics (optional)
+    times = []
+    
+    for i, query in enumerate(tqdm(queries, disable=True), start=1):
+        print(f"Doing the query {i} out of {len(queries)}")
+        start_time = time.time()
+        
+        # Process the query using your testing function and obtain results.
+        # (Adjust the call to testing() as needed.)
+        try:
+            results = testing("New_Embeddings_2025", query, forward_fn="Advanced", filter_fn=True)
+        except Exception as e:
+            # If testing() fails, record the error and skip to next query.
+            error_message = f"Error in testing(): {str(e)}"
+            row = {
+                "Query": query,
+                "Gemini Weights": None,
+                "Voyager Weights": None,
+                "Results": None,
+                "Gemini Response": None,
+                "Time Taken (seconds)": 0,
+                "Error Message": error_message
+            }
+            with open(csv_path, mode="a", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=header)
+                writer.writerow(row)
+            continue
+        
+        # Build structured_data from results
         structured_data = {
             "sections": {
-                "gemini": list(map(lambda x: get_processed_content_by_index(x, 'sections', 'gemini'), results['top_indices']['sections']['gemini_top_indices'])),
-                "voyage": list(map(lambda x: get_processed_content_by_index(x, 'sections', 'voyage'), results['top_indices']['sections']['voyager_top_indices'])),
+                "gemini": [get_processed_content_by_index(x, 'sections', 'gemini') for x in results['top_indices']['sections']['gemini_top_indices']],
+                "voyage": [get_processed_content_by_index(x, 'sections', 'voyage') for x in results['top_indices']['sections']['voyager_top_indices']],
             },
             "chapters": {
-                "gemini": list(map(lambda x: get_processed_content_by_index(x, 'chapters', 'gemini'), results['top_indices']['chapters']['gemini_top_indices'])),
-                "voyage": list(map(lambda x: get_processed_content_by_index(x, 'chapters', 'voyage'), results['top_indices']['chapters']['voyager_top_indices'])),
+                "gemini": [get_processed_content_by_index(x, 'chapters', 'gemini') for x in results['top_indices']['chapters']['gemini_top_indices']],
+                "voyage": [get_processed_content_by_index(x, 'chapters', 'voyage') for x in results['top_indices']['chapters']['voyager_top_indices']],
             },
             "pages": {
-                "gemini": list(map(lambda x: get_processed_content_by_index(x, 'pages', 'gemini'), results['top_indices']['pages']['gemini_top_indices'])),
-                "voyage": list(map(lambda x: get_processed_content_by_index(x, 'pages', 'voyage'), results['top_indices']['pages']['voyager_top_indices'])),
+                "gemini": [get_processed_content_by_index(x, 'pages', 'gemini') for x in results['top_indices']['pages']['gemini_top_indices']],
+                "voyage": [get_processed_content_by_index(x, 'pages', 'voyage') for x in results['top_indices']['pages']['voyager_top_indices']],
             }
         }
         
-        error_message = ""  # Initialize an empty string for error message
-        
+        error_message = ""
+        gemini_response = ""
         try:
-            # Try generating the response
             gemini_response = generate_response(prompt, query, structured_data)
-        except ValueError as e:
-            # Handle the ValueError if the response contains invalid content
-            print(f"Error generating response for query '{query}': {str(e)}")
-            gemini_response = "Error: Response could not be generated."
-            error_message = str(e)  # Store the error message for this query
+        except DeadlineExceeded as de:
+            error_message = f"DeadlineExceeded: {str(de)}"
+            gemini_response = "Error: Deadline Exceeded."
+        except Exception as e:
+            error_message = str(e)
+            gemini_response = f"Error: {error_message}"
         
-        end_time = time.time()  # Record the end time
-        time_taken = end_time - start_time  # Calculate the time taken for this loop
+        end_time = time.time()
+        time_taken = end_time - start_time
+        times.append(time_taken)
         
-        # Append the data for the current query
-        data.append({
+        # Prepare the row to be appended
+        row = {
             "Query": query,
-            "Gemini Weights": results['gemini_weight'],
-            "Voyager Weights": results['voyager_weight'],
-            "Results": results['top_indices'],
+            "Gemini Weights": results.get('gemini_weight'),
+            "Voyager Weights": results.get('voyager_weight'),
+            "Results": results.get('top_indices'),
             "Gemini Response": gemini_response,
             "Time Taken (seconds)": time_taken,
-            "Error Message": error_message  # Add error message to the data
-        })
+            "Error Message": error_message
+        }
         
-        # Store the time for each iteration
-        times.append(time_taken)
-    
-    # Create the DataFrame from the collected data
-    df = pd.DataFrame(data)
-    
-    # Calculate average, max, and min times
-    avg_time = sum(times) / len(times) if times else 0
-    max_time = max(times) if times else 0
-    min_time = min(times) if times else 0
-    
-    # Add the calculated times to the DataFrame (if you want to show them in the DataFrame as well)
-    df['Average Time'] = avg_time
-    df['Max Time'] = max_time
-    df['Min Time'] = min_time
-    
-    # Save the DataFrame to CSV
-    df.to_csv(r"Evaluation_Results.csv", index=False)
-    
-    print(f"Successfully Done with Evaluation\nAverage Time: {avg_time:.4f}s\nMax Time: {max_time:.4f}s\nMin Time: {min_time:.4f}s")
-
+        # Append the row to the CSV file immediately
+        with open(csv_path, mode="a", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=header)
+            writer.writerow(row)
+        
+    # Optionally, compute overall statistics and print them
+    if times:
+        avg_time = sum(times) / len(times)
+        max_time = max(times)
+        min_time = min(times)
+        print(f"Average time: {avg_time:.2f}s, Max time: {max_time:.2f}s, Min time: {min_time:.2f}s")
 
 
 
@@ -173,8 +289,8 @@ Final Function to retrive the indices, text, and generate response
 def LegalChatBot(query):
     base_path = "New_Embeddings_2025" 
     results= testing(base_path, query, forward_fn="Advanced", filter_fn= True)
-    print(f"Weights of Gemini: {results['gemini_weight']}")
-    print(f"Weights of Voyage: {results['voyager_weight']}")
+    #print(f"Weights of Gemini: {results['gemini_weight']}")
+    #print(f"Weights of Voyage: {results['voyager_weight']}")
     structured_data = {
     "sections": {
         "gemini": list(map(lambda x: get_processed_content_by_index(x, 'sections','gemini' ), results['top_indices']['sections']['gemini_top_indices'])),
@@ -189,11 +305,11 @@ def LegalChatBot(query):
         "voyage": list(map(lambda x: get_processed_content_by_index(x, 'pages', 'voyage'), results['top_indices']['pages']['voyager_top_indices'])),
     }
 }
-    print("#################################################################################################")
-    print("Gemini Response:")
+    #print("#################################################################################################")
+    #print("Gemini Response:")
     gemini_response = generate_response(prompt, query, structured_data)
-    print(gemini_response)
-    print("#################################################################################################")
+    #print(gemini_response)
+    #print("#################################################################################################")
     return gemini_response
 
 
@@ -227,7 +343,4 @@ queries = [
 ]
 
 
-evaluation(queries)
-
-
-
+#evaluation(queries)
