@@ -24,14 +24,16 @@ import json
 from typing import List, Dict, Union, Optional, Any
 from fuzzy import LegalQueryAnalyzer
 
+from dotenv import load_dotenv
 
+load_dotenv()
 genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
 
-try:
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = r"C:\Users\mkolla1\LawChatBot\gcpservicekey.json"
-except:
-    print("Error at Try block")
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = r"gcpservicekey.json"
+# try:
+#     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/npatel237/LawChatBot/gcpservicekey.json"
+# except:
+#     #print("Error at Try block")
+#     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = r"gcpservicekey.json"
     
 PROJECT_ID = "lawrag"
 LOCATION = "us-central1"
@@ -163,17 +165,17 @@ class LegalEmbeddingLoader:
         }
 
         for key, file_name in file_mappings.items():
-            print(self.base_path)
+            #print(self.base_path)
             file_path = os.path.join(self.base_path, key.split("_")[-1], file_name)
-            print(file_path)
+            #print(file_path)
             if not os.path.exists(file_path):
-                print(f"File {file_name} not found. Skipping...")
+                #print(f"File {file_name} not found. Skipping...")
                 continue
 
             # Read parquet file
             table = pq.read_table(file_path)
             df = table.to_pandas()
-            print(f"\nColumns in {file_name}: {df.columns.tolist()}")
+            #print(f"\nColumns in {file_name}: {df.columns.tolist()}")
             # Extract embeddings and metadata
             embeddings = np.stack(df["Embedding"].values)
 
@@ -189,7 +191,7 @@ class LegalEmbeddingLoader:
             # Store metadata
             self.metadata[key] = df.drop('Embedding', axis=1)
 
-            print(f"Loaded {file_name} ({model} - {granularity})")
+            #print(f"Loaded {file_name} ({model} - {granularity})")
         return self.gemini_embeddings, self.voyager_embeddings, self.metadata
 
     def get_embedding_dimensions(self):
@@ -242,12 +244,12 @@ class FusionRetrival(nn.Module):
         voyager_chapter_weights = F.softmax(voyager_chapter_similarities, dim=0)
         voyager_page_weights = F.softmax(voyager_page_similarities, dim=0)
 
-        print(f"Shape of gemini_section_weights: {gemini_section_weights.shape}")
-        print(f"Shape of voyager_section_weights: {voyager_section_weights.shape}")
-        print(f"Shape of gemini_chapter_weights: {gemini_chapter_weights.shape}")
-        print(f"Shape of voyager_chapter_weights: {voyager_chapter_weights.shape}")
-        print(f"Shape of gemini_page_weights: {gemini_page_weights.shape}")
-        print(f"Shape of voyager_page_weights: {voyager_page_weights.shape}")
+        #print(f"Shape of gemini_section_weights: {gemini_section_weights.shape}")
+        #print(f"Shape of voyager_section_weights: {voyager_section_weights.shape}")
+        #print(f"Shape of gemini_chapter_weights: {gemini_chapter_weights.shape}")
+        #print(f"Shape of voyager_chapter_weights: {voyager_chapter_weights.shape}")
+        #print(f"Shape of gemini_page_weights: {gemini_page_weights.shape}")
+        #print(f"Shape of voyager_page_weights: {voyager_page_weights.shape}")
         # Get top N indices
         gemini_section_top_values, gemini_section_top_indices = torch.topk(gemini_section_weights, self.top_n)
         gemini_chapter_top_values, gemini_chapter_top_indices = torch.topk(gemini_chapter_weights, self.top_n)
@@ -287,8 +289,8 @@ class FusionRetrival(nn.Module):
         # Project query embeddings
         gemini_query_embedding = gemini_query_embedding.unsqueeze(0)
         voyager_query_embedding = voyager_query_embedding.unsqueeze(0)
-        print(f"gemini_query_embedding: {gemini_query_embedding.shape}")
-        print(f"voyager_query_embedding: {voyager_query_embedding.shape}")
+        #print(f"gemini_query_embedding: {gemini_query_embedding.shape}")
+        #print(f"voyager_query_embedding: {voyager_query_embedding.shape}")
         gemini_query_projected = self.gemini_query_projector(gemini_query_embedding)
         voyager_query_projected = self.voyager_query_projector(voyager_query_embedding)
 
@@ -342,12 +344,12 @@ class FusionRetrival(nn.Module):
         voyager_chapter_weights = F.softmax(voyager_chapter_similarities, dim=0)
         voyager_page_weights = F.softmax(voyager_page_similarities, dim=0)
 
-        print(f"Shape of gemini_section_weights: {gemini_section_weights.shape}")
-        print(f"Shape of voyager_section_weights: {voyager_section_weights.shape}")
-        print(f"Shape of gemini_chapter_weights: {gemini_chapter_weights.shape}")
-        print(f"Shape of voyager_chapter_weights: {voyager_chapter_weights.shape}")
-        print(f"Shape of gemini_page_weights: {gemini_page_weights.shape}")
-        print(f"Shape of voyager_page_weights: {voyager_page_weights.shape}")
+        #print(f"Shape of gemini_section_weights: {gemini_section_weights.shape}")
+        #print(f"Shape of voyager_section_weights: {voyager_section_weights.shape}")
+        #print(f"Shape of gemini_chapter_weights: {gemini_chapter_weights.shape}")
+        #print(f"Shape of voyager_chapter_weights: {voyager_chapter_weights.shape}")
+        #print(f"Shape of gemini_page_weights: {gemini_page_weights.shape}")
+        #print(f"Shape of voyager_page_weights: {voyager_page_weights.shape}")
         # Get top N indices
         gemini_section_top_values, gemini_section_top_indices = torch.topk(gemini_section_weights, self.top_n)
         gemini_chapter_top_values, gemini_chapter_top_indices = torch.topk(gemini_chapter_weights, self.top_n)
@@ -378,7 +380,7 @@ class FusionRetrival(nn.Module):
                 "voyager_top_indices": voyager_page_top_indices
             }
         }
-        print("FINAL")
+        #print("FINAL")
         return {
             'top_indices': top_indices_dict
         }
@@ -387,8 +389,8 @@ class FusionRetrival(nn.Module):
         # Project query embeddings
         gemini_query_embedding = gemini_query_embedding.unsqueeze(0)
         voyager_query_embedding = voyager_query_embedding.unsqueeze(0)
-        # print(f"gemini_query_embedding: {gemini_query_embedding.shape}")
-        # print(f"voyager_query_embedding: {voyager_query_embedding.shape}")
+        # #print(f"gemini_query_embedding: {gemini_query_embedding.shape}")
+        # #print(f"voyager_query_embedding: {voyager_query_embedding.shape}")
         # gemini_query_projected = self.gemini_query_projector(gemini_query_embedding)
         # voyager_query_projected = self.voyager_query_projector(voyager_query_embedding)
 
@@ -442,12 +444,12 @@ class FusionRetrival(nn.Module):
         voyager_chapter_weights = F.softmax(voyager_chapter_similarities, dim=0)
         voyager_page_weights = F.softmax(voyager_page_similarities, dim=0)
 
-        print(f"Shape of gemini_section_weights: {gemini_section_weights.shape}")
-        print(f"Shape of voyager_section_weights: {voyager_section_weights.shape}")
-        print(f"Shape of gemini_chapter_weights: {gemini_chapter_weights.shape}")
-        print(f"Shape of voyager_chapter_weights: {voyager_chapter_weights.shape}")
-        print(f"Shape of gemini_page_weights: {gemini_page_weights.shape}")
-        print(f"Shape of voyager_page_weights: {voyager_page_weights.shape}")
+        #print(f"Shape of gemini_section_weights: {gemini_section_weights.shape}")
+        #print(f"Shape of voyager_section_weights: {voyager_section_weights.shape}")
+        #print(f"Shape of gemini_chapter_weights: {gemini_chapter_weights.shape}")
+        #print(f"Shape of voyager_chapter_weights: {voyager_chapter_weights.shape}")
+        #print(f"Shape of gemini_page_weights: {gemini_page_weights.shape}")
+        #print(f"Shape of voyager_page_weights: {voyager_page_weights.shape}")
         # Get top N indices
         gemini_section_top_values, gemini_section_top_indices = torch.topk(gemini_section_weights, self.top_n)
         gemini_chapter_top_values, gemini_chapter_top_indices = torch.topk(gemini_chapter_weights, self.top_n)
@@ -478,7 +480,7 @@ class FusionRetrival(nn.Module):
                 "voyager_top_indices": voyager_page_top_indices
             }
         }
-        print("FINAL")
+        #print("FINAL")
         return {
             'top_indices': top_indices_dict
         }
@@ -534,7 +536,7 @@ def get_weighted_indices(top_indices_dict, gemini_weight, voyager_weight):
         top_indices_dict[granularity]["voyager_top_indices"] = voyager_indices[:num_voyager]
         top_indices_dict[granularity]["voyager_top_values"] = voyager_values[:num_voyager]
     
-    print("FINAL")
+    #print("FINAL")
     return {
         'top_indices': top_indices_dict
     }
@@ -571,15 +573,15 @@ def testing(base_path, query, forward_fn, filter_fn):
     analyzer = LegalQueryAnalyzer(use_gemini=True)
 
     query_weights = analyzer.analyze_query(query)
-    print("&&&&&&&&&&&&&&&&&")
-    print(query_weights['weights']['gemini'])
-    print(query_weights['weights']['voyager'])
+    #print("&&&&&&&&&&&&&&&&&")
+    #print(query_weights['weights']['gemini'])
+    #print(query_weights['weights']['voyager'])
 
     embedder = EmbeddingGenerator()
     gemini_query_embeddings= embedder.get_embeddings_gemini([query])
     voyage_query_embeddings= embedder.get_embeddings_voyage([query])
     query_output = {'gemini_embedding': gemini_query_embeddings[0], 'voyage_embedding': voyage_query_embeddings[0]}
-    print("********************************")
+    #print("********************************")
     # Run the model
     if forward_fn == "simple":
         output = model.forward(
@@ -597,21 +599,23 @@ def testing(base_path, query, forward_fn, filter_fn):
         )
     
     for granularity, data in output['top_indices'].items():
-        print(f"\n--- {granularity.capitalize()} ---")
-        print(f"Gemini Top Indices: {data['gemini_top_indices']} GEMINI TOP VALUES: {data['gemini_top_values']}")
-        print(f"Voyager Top Indices: {data['voyager_top_indices']} VOYAGER TOP VALUES: {data['voyager_top_values']}")
-    # print("AFTER Processing and WEIGHTED")
+        pass
+        #print(f"\n--- {granularity.capitalize()} ---")
+        #print(f"Gemini Top Indices: {data['gemini_top_indices']} GEMINI TOP VALUES: {data['gemini_top_values']}")
+        #print(f"Voyager Top Indices: {data['voyager_top_indices']} VOYAGER TOP VALUES: {data['voyager_top_values']}")
+    # #print("AFTER Processing and WEIGHTED")
 
     
 
     if filter_fn:
         cleaned_top_indices = remove_duplicates(output['top_indices'])
         final_indices = get_weighted_indices(cleaned_top_indices, query_weights['weights']['gemini'], query_weights['weights']['voyager'])
-        print(final_indices)
+        #print(final_indices)
         for granularity, data in final_indices['top_indices'].items():
-            print(f"\n--- {granularity.capitalize()} ---")
-            print(f"Gemini Top Indices: {data['gemini_top_indices']} GEMINI TOP VALUES: {data['gemini_top_values']}")
-            print(f"Voyager Top Indices: {data['voyager_top_indices']} VOYAGER TOP VALUES: {data['voyager_top_values']}")
+            pass
+            #print(f"\n--- {granularity.capitalize()} ---")
+            #print(f"Gemini Top Indices: {data['gemini_top_indices']} GEMINI TOP VALUES: {data['gemini_top_values']}")
+            #print(f"Voyager Top Indices: {data['voyager_top_indices']} VOYAGER TOP VALUES: {data['voyager_top_values']}")
         weights = {'gemini_weight': query_weights['weights']['gemini'], 'voyager_weight': query_weights['weights']['voyager']}
         final_output = {**final_indices, **weights}
         return final_output
