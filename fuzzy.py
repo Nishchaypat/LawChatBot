@@ -604,6 +604,3 @@ class LegalQueryAnalyzer:
             'gemini': gemini_weight,
             'voyager': voyager_weight
         }
-
-    
-
