@@ -10,7 +10,6 @@ client = QdrantClient(
     url="https://cecd63ca-9699-4bc0-a60f-3c7e8c768fd3.europe-west3-0.gcp.cloud.qdrant.io:6333",
     api_key="jwv0ETSb8751Q1yrQ3RVSsChFudsv1M63mEvxXXRnLf_ROoeAfe_Wg"
 )
-
 collection_name = "LawEmbedding"
 tokenizer = AutoTokenizer.from_pretrained("nlpaueb/legal-bert-base-uncased")
 model = AutoModel.from_pretrained("nlpaueb/legal-bert-base-uncased")
