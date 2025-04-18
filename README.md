@@ -4,7 +4,7 @@
 
 The longest text in the content column is 39390, which may not be efficiently embed due to token limitation.
 
-This research presents the development of a legal chatbot designed to assist users in navigating contradicting (similar) legal content with improved precision and speed. The chatbot follows a structured five-stage process:
+This research presents the development of a legal chatbot designed to assist users in navigating contradicting (similar) legal content with improved precision and speed. The chatbot follows a structured five-stage process: 
 
 1. **Data Extraction**
 2. **Data Cleaning and Organizing**
